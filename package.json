@@ -4,7 +4,10 @@
   "description": "",
   "main": "git-switch.js",
   "dependencies": {
-    "lodash": "^4.11.1"
+    "gitconfig": "^1.4.0",
+    "lodash": "^4.11.1",
+    "ssh-keygen2": "^0.1.0",
+    "winston": "^2.2.0"
   },
   "devDependencies": {},
   "scripts": {
