@@ -1,0 +1,15 @@
+{
+  "name": "git-switch",
+  "version": "1.0.0",
+  "description": "",
+  "main": "git-switch.js",
+  "dependencies": {
+    "lodash": "^4.11.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
