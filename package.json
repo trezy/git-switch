@@ -15,8 +15,8 @@
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "git config --global alias.switch git-switch"
   },
-  "author": "",
+  "author": "Trezy <tre@trezy.com",
   "license": "GPL-3.0"
 }
