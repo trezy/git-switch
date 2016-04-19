@@ -20,6 +20,7 @@
 
 'use strict'
 
+let _ = require('lodash')
 let ncp = require('copy-paste')
 let fs = require('fs')
 let gitconfig = require('gitconfig')
@@ -141,7 +142,7 @@ new class GitSwitch {
 
 
 
-  _checkConfigDirectory () {
+  _ensureConfigDirectory () {
 
     // Check to see if the config directory already exists. If not, create it.
     try {
@@ -174,14 +175,6 @@ new class GitSwitch {
 
 
 
-  _getConfigs () {
-    return fs.readdirSync(appConfigPath)
-  }
-
-
-
-
-
   _run () {
     this.commands.forEach((command) => {
       if (process.argv[0] === command) {
@@ -206,11 +199,9 @@ new class GitSwitch {
     let sshPrivateKeyPath = path.resolve(sshPath, 'id_rsa')
     let sshPublicKeyPath = path.resolve(sshPath, 'id_rsa.pub')
 
-    process.env.GIT_SWITCH_CURRENT = process.env.GIT_SWITCH_CURRENT || undefined
-
-    if (process.env.GIT_SWITCH_CURRENT === undefined || process.env.GIT_SWITCH_CURRENT !== configToUse) {
+    if (!this.currentProfile || this.currentProfile !== configToUse) {
       // Record the currently selected profile
-      process.env.GIT_SWITCH_CURRENT = configToUse
+      this.currentProfile = configToUse
 
       // Delete previous keypair links
       fs.unlinkSync(sshPrivateKeyPath)
@@ -249,13 +240,12 @@ new class GitSwitch {
   add () {
     // Create a JSON config file
     let config = gitconfig.get.sync('user', {location: 'global'})
-    let configs = this._getConfigs()
 
     prompt.start()
 
     prompt.get([{
       conform: (value) => {
-        return configs.indexOf(value) !== -1 ? false : true
+        return this.configs.indexOf(value) !== -1 ? false : true
       },
       description: 'What would you like to name this config?',
       message: 'A config name is required and must not yet exist',
@@ -292,7 +282,7 @@ new class GitSwitch {
     this.commands = ['add', 'key', 'list', 'remove', 'switch']
 
     // Always ensure that the config directory exists
-    this._checkConfigDirectory()
+    this._ensureConfigDirectory()
 
     // Run the command
     this._run()
@@ -303,9 +293,13 @@ new class GitSwitch {
 
 
   key () {
-    ncp.copy(fs.readFileSync(path.resolve(sshPath, 'id_rsa.pub'), 'utf8'), () => {
-      winston.info('Copied the current key to your clipboard!')
-    })
+    if (this.currentProfile) {
+      ncp.copy(fs.readFileSync(path.resolve(appConfigPath, this.currentProfile, 'publickey'), 'utf8'), () => {
+        winston.info(`Copied the currently public key for ${this.currentProfile} to your clipboard!`)
+      })
+    } else {
+      winston.info('You must select a profile before you can copy its key')
+    }
   }
 
 
@@ -313,7 +307,7 @@ new class GitSwitch {
 
 
   list () {
-    winston.info('Available configs:', this._getConfigs().join(', '))
+    winston.info('Available configs:', this.configs.join(', '))
   }
 
 
@@ -329,13 +323,11 @@ new class GitSwitch {
       this._deleteConfig(configToDelete)
 
     } else {
-      let configs = this._getConfigs()
-
       prompt.start()
 
       prompt.get([{
         conform: (value) => {
-          return configs.indexOf(value) !== -1 ? true : false
+          return this.configs.indexOf(value) !== -1 ? true : false
         },
         description: `Which config do you want to remove? (${configs.join(', ')})`,
         name: 'configToDelete',
@@ -356,13 +348,12 @@ new class GitSwitch {
 
 
   switch () {
-    let configs = this._getConfigs()
     let configToUse
 
     if (process.argv.length) {
       configToUse = process.argv.shift()
 
-      if (configs.indexOf(configToUse) === -1) {
+      if (this.configs.indexOf(configToUse) === -1) {
         winston.error(`${configToUse} config doesn't exist`)
 
       } else {
@@ -375,9 +366,9 @@ new class GitSwitch {
 
       prompt.get([{
         conform: (value) => {
-          return configs.indexOf(value) !== -1 ? true : false
+          return this.configs.indexOf(value) !== -1 ? true : false
         },
-        description: `Which config do you want to use? (${configs.join(', ')})`,
+        description: `Which config do you want to use? (${this.configs.join(', ')})`,
         name: 'configToUse',
         required: true
       }], (error, results) => {
@@ -391,5 +382,42 @@ new class GitSwitch {
         }
       })
     }
+  }
+
+
+
+
+
+  /******************************************************************************\
+    Getters
+  \******************************************************************************/
+
+  get configs () {
+    return _.without(fs.readdirSync(appConfigPath), 'current')
+  }
+
+  get currentProfile () {
+    if (!this._currentProfile) {
+      try {
+        this._currentProfile = fs.readFileSync(path.resolve(appConfigPath, 'current'), 'utf8')
+      } catch (error) {
+        this._currentProfile = undefined
+      }
+    }
+
+    return this._currentProfile
+  }
+
+
+
+
+
+  /******************************************************************************\
+    Setters
+  \******************************************************************************/
+
+  set currentProfile (value) {
+    this._currentProfile = value
+    fs.writeFileSync(path.resolve(appConfigPath, 'current'), value, 'utf8')
   }
 }
