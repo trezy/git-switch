@@ -3,7 +3,7 @@
     "git-switch": "./index.js"
   },
   "name": "git-switch",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "main": "git-switch.js",
   "dependencies": {
