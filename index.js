@@ -182,6 +182,14 @@ new class GitSwitch {
       }
     })
 
+    if (!this.command) {
+      if (this.configs.length) {
+        this.command = 'switch'
+      } else {
+        this.command = 'add'
+      }
+    }
+
     this[this.command || 'switch']()
   }
 
@@ -395,6 +403,10 @@ new class GitSwitch {
   get configs () {
     return _.without(fs.readdirSync(appConfigPath), 'current')
   }
+
+
+
+
 
   get currentProfile () {
     if (!this._currentProfile) {

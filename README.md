@@ -12,7 +12,7 @@ Switching between profiles will update your global git config to use the data in
 
 | command             | purpose                                               |
 | ------------------- | ----------------------------------------------------- |
-| `git switch`        | Switches profiles                                     |
+| `git switch`        | Switches profiles or adds a profile if none exist     |
 | `git switch add`    | Adds a profile                                        |
 | `git switch key`    | Copy's the current profile's SSH key to the clipboard |
 | `git switch list`   | Lists all available profiles                          |
