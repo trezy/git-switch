@@ -1,4 +1,7 @@
 {
+  "bin": {
+    "git-switch": "./git-switch.js"
+  },
   "name": "git-switch",
   "version": "1.0.0",
   "description": "",
@@ -6,6 +9,7 @@
   "dependencies": {
     "gitconfig": "^1.4.0",
     "lodash": "^4.11.1",
+    "prompt": "^1.0.0",
     "ssh-keygen2": "^0.1.0",
     "winston": "^2.2.0"
   },

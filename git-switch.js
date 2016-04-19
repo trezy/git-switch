@@ -6,6 +6,7 @@ let fs = require('fs')
 let gitconfig = require('gitconfig')
 let keygen = require('ssh-keygen2')
 let path = require('path')
+let prompt = require('prompt')
 let winston = require('winston')
 
 let homePath = path.resolve(process.env['HOME'])
@@ -14,6 +15,9 @@ let sshPath = path.resolve(homePath, '.ssh')
 
 let nodeBin = process.argv.shift()
 let script = process.argv.shift()
+
+prompt.delimiter = ''
+prompt.message = ''
 
 
 
@@ -48,13 +52,9 @@ new class GitSwitch {
 
 
 
-  _createConfig () {
-    let configJSON = {}
-    let name = this.args.name.value
-    let useGlobal = this.args['use-global'].value
-
-    let configPath = path.resolve(appConfigPath, name)
-    let configJSONPath = path.resolve(appConfigPath, name, 'config.json')
+  _createConfig (config) {
+    let configPath = path.resolve(appConfigPath, config.configName)
+    let configJSONPath = path.resolve(appConfigPath, config.configName, 'config.json')
     let privateKeyPath = path.resolve(configPath, 'privatekey')
     let publicKeyPath = path.resolve(configPath, 'publickey')
     let sshPrivateKeyPath = path.resolve(sshPath, 'id_rsa')
@@ -64,68 +64,56 @@ new class GitSwitch {
     // for it.
     try {
       fs.readdirSync(configPath)
-      winston.info(`${name} config already exists.`)
+      winston.info(`${config.configName} config already exists.`)
       return
 
     } catch (error) {
       fs.mkdirSync(configPath)
     }
 
-    if (useGlobal) {
-      // Move the current keypair to the config folder
-      fs.rename(sshPrivateKeyPath, privateKeyPath)
-      fs.rename(sshPublicKeyPath, publicKeyPath)
+    gitconfig.set({
+      'user.email': config.email,
+      'user.name': config.name
+    }, {
+      location: 'global'
+    }, (error) => {
+      if (error) {
+        winston.error('Couldn\'t set global git config')
+      }
+    })
 
-      // Create a symlink to the keypair so we don't create a ton of havoc
-      fs.symlinkSync(privateKeyPath, sshPrivateKeyPath)
-      fs.symlinkSync(publicKeyPath, sshPublicKeyPath)
+    // Save the config
+    delete config.useCurrentSSH
+    fs.writeFile(configJSONPath, JSON.stringify(config, null, 2), 'utf8')
 
-      // Create a JSON config file
-      gitconfig.get('user', {location: 'global'}, (error, config) => {
-        if (error) {
-          winston.error('Couldn\'t read git config', error)
+    if (config.useCurrentSSH) {
+      // Move the current keypair to the config folder and create symlinks to
+      // avoid causing havoc
+      fs.rename(sshPrivateKeyPath, privateKeyPath, () => {
+        fs.symlinkSync(privateKeyPath, sshPrivateKeyPath)
+      })
 
-        } else {
-          if (config.email) {
-            configJSON.email = config.email
-          }
-
-          if (config.name) {
-            configJSON.name = config.name
-          }
-
-          fs.writeFile(configJSONPath, JSON.stringify(configJSON, null, 2), 'utf8')
-        }
+      fs.rename(sshPublicKeyPath, publicKeyPath, () => {
+        fs.symlinkSync(publicKeyPath, sshPublicKeyPath)
       })
 
     } else {
 
       // Create the SSH keypair
       keygen({
-        comment: name,
+        comment: config.configName,
         keep: true,
-        location: privateKeyPath
+        location: path.resolve(configPath, config.configName)
       }, (error, keypair) => {
         if (error) {
-          console.log('Failed to create keypair')
+          winston.error('Failed to create keypair')
         } else {
 
           // Rename the keypair to match our naming scheme
-          fs.rename(path.resolve(configPath, name), privateKeyPath)
-          fs.rename(path.resolve(configPath, name + '.pub'), publicKeyPath)
+          fs.rename(path.resolve(configPath, config.configName), privateKeyPath)
+          fs.rename(path.resolve(configPath, config.configName + '.pub'), publicKeyPath)
         }
       })
-
-      // Create a JSON config file
-      if (this.args['git-email'].value) {
-        configJSON.email = this.args['git-email'].value
-      }
-
-      if (this.args['git-name'].value) {
-        configJSON.name = this.args['git-name'].value
-      }
-
-      fs.writeFile(configJSONPath, JSON.stringify(configJSON, null, 2), 'utf8')
     }
   }
 
@@ -148,80 +136,26 @@ new class GitSwitch {
 
 
 
-  _deleteConfig () {
-    let configPath = path.resolve(appConfigPath, this.args.name.value)
+  _deleteConfig (configToDelete) {
+    let configPath = path.resolve(appConfigPath, configToDelete)
 
-    // If the config exists, cycle through and delete each file in the config,
-    // then delete the directory itself
-    try {
-      fs.readdirSync(configPath).forEach((filename) => {
-        fs.unlinkSync(path.resolve(configPath, filename))
-      })
+    // Cycle through and delete each file in the config, then delete the
+    // directory itself
+    fs.readdirSync(configPath).forEach((filename) => {
+      fs.unlinkSync(path.resolve(configPath, filename))
+    })
 
-      fs.rmdirSync(configPath)
-    } catch (error) {
-      winston.error(`No config named ${this.args.name.value} was found`)
-    }
+    fs.rmdirSync(configPath)
+
+    winston.info(`Deleted ${configToDelete}`)
   }
 
 
 
 
 
-  _handleUnrecognized (flag) {
-    winston.error(`${flag} is not a recognized argument.`)
-  }
-
-
-
-
-
-  _parseArgs () {
-    // Cycle through the rest of the args passed to the CLI
-    for (let i = 0; i < process.argv.length; i++) {
-
-      // Check if the arg is a flag and shift it off the array if so
-      if (process.argv[i].indexOf('-') === 0) {
-        let flag = process.argv.shift()
-
-        // Check if it's a full flag or an alias
-        if (flag.indexOf('--') === 0) {
-
-          // Full flag, easy sauce
-          flag = flag.substring(2)
-
-        } else {
-          let tmpFlag = flag.substring(1)
-
-          // It's an alias so we'll cycle through all of the recognized args,
-          // then cycle through their alias array (if they have one) looking
-          // for matches
-          flag = this._convertAlias(tmpFlag)
-
-          if (flag === undefined) {
-            this._handleUnrecognized(tmpFlag)
-            return
-          }
-        }
-
-        if (this.args[flag] !== undefined) {
-
-          // If the next arg is not a flag then it's the value to be set for
-          // the flag. Otherwise this must be a boolean.
-          if (process.argv.length && process.argv[i].indexOf('-') === -1) {
-            this.args[flag].value = foo
-
-          } else {
-            this.args[flag].value = !this.args[flag].value
-          }
-
-        } else {
-          this._handleUnrecognized(flag)
-          return
-        }
-
-      }
-    }
+  _getConfigs () {
+    return fs.readdirSync(appConfigPath)
   }
 
 
@@ -252,8 +186,8 @@ new class GitSwitch {
 
 
 
-  _switchConfig () {
-    let name = this.args.name.value
+  _switchConfig (configToUse) {
+    let name = configToUse
     let configPath = path.resolve(appConfigPath, name)
     let configJSONPath = path.resolve(appConfigPath, name, 'config.json')
     let configJSON = JSON.parse(fs.readFileSync(configJSONPath, 'utf8'))
@@ -278,7 +212,11 @@ new class GitSwitch {
       location: 'global'
     }, (error) => {
       if (error) {
-        console.error('Couldn\'t set global git config')
+        winston.error('Couldn\'t set global git config')
+        return false
+
+      } else {
+        return true
       }
     })
   }
@@ -292,9 +230,38 @@ new class GitSwitch {
   \******************************************************************************/
 
   add () {
-    winston.info(`Adding ${this.args.name.value} config`)
+    // Create a JSON config file
+    let config = gitconfig.get.sync('user', {location: 'global'})
+    let configs = this._getConfigs()
 
-    this._createConfig()
+    prompt.start()
+
+    prompt.get([{
+      conform: (value) => {
+        return configs.indexOf(value) !== -1 ? false : true
+      },
+      description: 'What would you like to name this config?',
+      message: 'A config name is required and must not yet exist',
+      name: 'configName',
+      required: true
+    }, {
+      default: config.name,
+      description: 'What\'s your name?',
+      name: 'name'
+    }, {
+      default: config.email,
+      description: 'What email would you like to use?',
+      name: 'email'
+    }, {
+      default: 'y',
+      description: 'Would you like to use the current SSH keypair? (y/n)',
+      message: 'Must be a yes or a no',
+      name: 'useCurrentSSH',
+      pattern: /y|yes|yup|n|no|nope/,
+      type: 'string'
+    }], (error, results) => {
+      this._createConfig(results)
+    })
   }
 
 
@@ -302,26 +269,16 @@ new class GitSwitch {
 
 
   constructor () {
-
-    // Define all of the potential arguments that can be passed to the CLI
-    this.args = {
-      'name': {
-        value: 'default'
-      }
-    }
+    this.args = {}
 
     // Define all of the potential commands contained by the CLI
-    this.commands = ['add', 'remove', 'switch', 'update']
+    this.commands = ['add', 'list', 'remove', 'switch']
 
     // Always ensure that the config directory exists
     this._checkConfigDirectory()
 
     // Parse the command passed to figure out what command the user wants to run
     this._parseCommand()
-
-    // Parse the arguments passed to configure the CLI before running the
-    // command
-    this._parseArgs()
 
     // Run the command
     this._run()
@@ -331,10 +288,43 @@ new class GitSwitch {
 
 
 
-  remove () {
-    winston.info(`Removing ${this.args.name.value} config`)
+  list () {
+    winston.info('Available configs:', this._getConfigs().join(', '))
+  }
 
-    this._deleteConfig()
+
+
+
+
+  remove () {
+    let configToDelete
+
+    if (process.argv.length) {
+      configToDelete = process.argv.shift()
+      winston.info(`Removing ${configToDelete} config`)
+      this._deleteConfig(configToDelete)
+
+    } else {
+      let configs = this._getConfigs()
+
+      prompt.start()
+
+      prompt.get([{
+        conform: (value) => {
+          return configs.indexOf(value) !== -1 ? true : false
+        },
+        description: `Which config do you want to remove? (${configs.join(', ')})`,
+        name: 'configToDelete',
+        required: true
+      }], (error, results) => {
+        if (error) {
+          winston.error(error)
+
+        } else {
+          this._deleteConfig(results.configToDelete)
+        }
+      })
+    }
   }
 
 
@@ -342,8 +332,40 @@ new class GitSwitch {
 
 
   switch () {
-    winston.info(`Switching to ${this.args.name.value} config`)
+    let configs = this._getConfigs()
+    let configToUse
 
-    this._switchConfig()
+    if (process.argv.length) {
+      configToUse = process.argv.shift()
+
+      if (configs.indexOf(configToUse) === -1) {
+        winston.error(`${configToUse} config doesn't exist`)
+
+      } else {
+        winston.info(`Switching to ${configToUse} config`)
+        this._switchConfig(configToUse)
+      }
+
+    } else {
+      prompt.start()
+
+      prompt.get([{
+        conform: (value) => {
+          return configs.indexOf(value) !== -1 ? true : false
+        },
+        description: `Which config do you want to use? (${configs.join(', ')})`,
+        name: 'configToUse',
+        required: true
+      }], (error, results) => {
+        if (error) {
+          winston.error(error)
+
+        } else {
+          if (this._switchConfig(results.configToUse)) {
+            winston.info(`Now using ${results.configToUse}`)
+          }
+        }
+      })
+    }
   }
 }
