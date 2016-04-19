@@ -20,6 +20,7 @@
 
 'use strict'
 
+let ncp = require('copy-paste')
 let fs = require('fs')
 let gitconfig = require('gitconfig')
 let keygen = require('ssh-keygen2')
@@ -280,13 +281,23 @@ new class GitSwitch {
     this.args = {}
 
     // Define all of the potential commands contained by the CLI
-    this.commands = ['add', 'list', 'remove', 'switch']
+    this.commands = ['add', 'key', 'list', 'remove', 'switch']
 
     // Always ensure that the config directory exists
     this._checkConfigDirectory()
 
     // Run the command
     this._run()
+  }
+
+
+
+
+
+  key () {
+    ncp.copy(fs.readFileSync(path.resolve(sshPath, 'id_rsa.pub'), 'utf8'), () => {
+      winston.info('Copied the current key to your clipboard!')
+    })
   }
 
 
