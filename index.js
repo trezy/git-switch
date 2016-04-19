@@ -162,24 +162,14 @@ new class GitSwitch {
 
 
 
-  _parseCommand () {
+  _run () {
     this.commands.forEach((command) => {
       if (process.argv[0] === command) {
         this.command = process.argv.shift()
       }
     })
 
-    if (!this.command) {
-      this.command = this.commands['switch']
-    }
-  }
-
-
-
-
-
-  _run () {
-    this[this.command]()
+    this[this.command || 'switch']()
   }
 
 
@@ -276,9 +266,6 @@ new class GitSwitch {
 
     // Always ensure that the config directory exists
     this._checkConfigDirectory()
-
-    // Parse the command passed to figure out what command the user wants to run
-    this._parseCommand()
 
     // Run the command
     this._run()
