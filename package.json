@@ -1,6 +1,6 @@
 {
   "bin": {
-    "git-switch": "./git-switch.js"
+    "git-switch": "./index.js"
   },
   "name": "git-switch",
   "version": "1.0.0",
