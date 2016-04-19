@@ -102,6 +102,7 @@ new class GitSwitch {
     })
 
     // Save the config
+    delete config.configName
     delete config.useCurrentSSH
     fs.writeFile(configJSONPath, JSON.stringify(config, null, 2), 'utf8')
 
@@ -205,29 +206,36 @@ new class GitSwitch {
     let sshPrivateKeyPath = path.resolve(sshPath, 'id_rsa')
     let sshPublicKeyPath = path.resolve(sshPath, 'id_rsa.pub')
 
-    // Delete previous keypair links
-    fs.unlinkSync(sshPrivateKeyPath)
-    fs.unlinkSync(sshPublicKeyPath)
+    process.env.GIT_SWITCH_CURRENT = process.env.GIT_SWITCH_CURRENT || undefined
 
-    // Create new keypair links
-    fs.symlinkSync(privateKeyPath, sshPrivateKeyPath)
-    fs.symlinkSync(publicKeyPath, sshPublicKeyPath)
+    if (process.env.GIT_SWITCH_CURRENT === undefined || process.env.GIT_SWITCH_CURRENT !== configToUse) {
+      // Record the currently selected profile
+      process.env.GIT_SWITCH_CURRENT = configToUse
 
-    // Update global git name and email with config name and email
-    gitconfig.set({
-      'user.email': configJSON.email,
-      'user.name': configJSON.name
-    }, {
-      location: 'global'
-    }, (error) => {
-      if (error) {
-        winston.error('Couldn\'t set global git config')
-        return false
+      // Delete previous keypair links
+      fs.unlinkSync(sshPrivateKeyPath)
+      fs.unlinkSync(sshPublicKeyPath)
 
-      } else {
-        return true
-      }
-    })
+      // Create new keypair links
+      fs.symlinkSync(privateKeyPath, sshPrivateKeyPath)
+      fs.symlinkSync(publicKeyPath, sshPublicKeyPath)
+
+      // Update global git name and email with config name and email
+      gitconfig.set({
+        'user.email': configJSON.email,
+        'user.name': configJSON.name
+      }, {
+        location: 'global'
+      }, (error) => {
+        if (error) {
+          winston.error('Couldn\'t set global git config')
+          return false
+
+        } else {
+          return true
+        }
+      })
+    }
   }
 
 
