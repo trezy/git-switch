@@ -10,10 +10,10 @@ Switching between profiles will update your global git config to use the data in
 
 ## Usage
 
-| command             | purpose                                     |
-| ------------------- | ------------------------------------------- |
-| `git switch`        | Switches profiles                           |
-| `git switch add`    | Adds a profile                              |
-| `git switch key`    | Copy's the current SSH key to the clipboard |
-| `git switch list`   | Lists all available profiles                |
-| `git switch remove` | Removes a profile                           |
+| command             | purpose                                               |
+| ------------------- | ----------------------------------------------------- |
+| `git switch`        | Switches profiles                                     |
+| `git switch add`    | Adds a profile                                        |
+| `git switch key`    | Copy's the current profile's SSH key to the clipboard |
+| `git switch list`   | Lists all available profiles                          |
+| `git switch remove` | Removes a profile                                     |
