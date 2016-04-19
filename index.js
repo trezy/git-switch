@@ -197,7 +197,7 @@ new class GitSwitch {
 
 
 
-  _switchConfig (configToUse) {
+  _switchConfig (configToUse, reset) {
     let name = configToUse
     let configPath = path.resolve(appConfigPath, name)
     let configJSONPath = path.resolve(appConfigPath, name, 'config.json')
@@ -207,7 +207,7 @@ new class GitSwitch {
     let sshPrivateKeyPath = path.resolve(sshPath, 'id_rsa')
     let sshPublicKeyPath = path.resolve(sshPath, 'id_rsa.pub')
 
-    if (!this.currentProfile || this.currentProfile !== configToUse) {
+    if (!this.currentProfile || this.currentProfile !== configToUse || reset) {
       // Record the currently selected profile
       this.currentProfile = configToUse
 
@@ -287,7 +287,7 @@ new class GitSwitch {
     this.args = {}
 
     // Define all of the potential commands contained by the CLI
-    this.commands = ['add', 'key', 'list', 'remove', 'switch']
+    this.commands = ['add', 'key', 'list', 'remove', 'reset', 'switch']
 
     // Always ensure that the config directory exists
     this._ensureConfigDirectory()
@@ -348,6 +348,19 @@ new class GitSwitch {
           this._deleteConfig(results.configToDelete)
         }
       })
+    }
+  }
+
+
+
+
+
+  reset () {
+    if (this.currentProfile) {
+      winston.info(`Resetting git profile for ${this.currentProfile}`)
+      this._switchConfig(this.currentProfile, true)
+    } else {
+      winston.error('Can\'t reset if no profile is set')
     }
   }
 

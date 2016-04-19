@@ -17,3 +17,4 @@ Switching between profiles will update your global git config to use the data in
 | `git switch key`    | Copy's the current profile's SSH key to the clipboard |
 | `git switch list`   | Lists all available profiles                          |
 | `git switch remove` | Removes a profile                                     |
+| `git switch reset`  | Resets git and SSH settings to the current profile    |
